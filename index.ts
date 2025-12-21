@@ -5,43 +5,104 @@ type BlockEntity = { uuid: string; content: string; children?: BlockEntity[] };
 type ScanStats = { scanned: number; marked: number; inputsFound: number; inputsUpdated: number };
 
 const DEFAULT_OFFSETS = "1,2,4,7,15,30,90,180";
-const DEFAULT_MARKER_OFFSETS = "@ebbinghaus-created"; // template-only offsets
-const DEFAULT_MARKER_RANGE = "@ebbinghaus-range";     // RANGE can work on ANY page
+const DEFAULT_MARKER_OFFSETS = "@ebbinghaus-created"; // offsets (template-only)
+const DEFAULT_MARKER_RANGE = "@ebbinghaus-range";     // range (any page)
 const DEFAULT_TEMPLATE_PAGES = "Templates";
 const DEFAULT_MAX_RANGE_DAYS = 400;
 
 const settings: SettingSchemaDesc[] = [
-  { key: "templatePages", type: "string", default: DEFAULT_TEMPLATE_PAGES, title: "Template source page(s) (offsets only)",
-    description: "Comma-separated page names that hold your TEMPLATE blocks for offsets. Only these pages are updated for offsets marker." },
-  { key: "caseInsensitivePageMatch", type: "boolean", default: true, title: "Case-insensitive template page match",
-    description: "If true, match template page names case-insensitively." },
-  { key: "markerOffsets", type: "string", default: DEFAULT_MARKER_OFFSETS, title: "Marker (offsets)",
-    description: "Marker for offsets blocks. These are updated ONLY inside template source pages." },
-  { key: "markerRange", type: "string", default: DEFAULT_MARKER_RANGE, title: "Marker (RANGE)",
-    description: "Marker for RANGE blocks. These can be updated on ANY page." },
-  { key: "propertyKey", type: "string", default: "created", title: "Property key",
-    description: "Page property key containing the created date (default: created)." },
-  { key: "offsetDays", type: "string", default: DEFAULT_OFFSETS, title: "Ebbinghaus offsets (days)",
-    description: "Comma-separated offsets, e.g. 1,2,4,7,15,30,90,180" },
-  { key: "excludeToday", type: "boolean", default: true, title: "Exclude today",
-    description: "Exclude today (true => yesterday is offset 1)." },
-
-  // NEW: Default RANGE in settings UI
-  { key: "rangeStart", type: "string", default: "", title: "RANGE start (YYYYMMDD)",
-    description: "Optional default start date for RANGE insertion and fallback when no RANGE sentinel exists." },
-  { key: "rangeEnd", type: "string", default: "", title: "RANGE end (YYYYMMDD)",
-    description: "Optional default end date for RANGE insertion and fallback when no RANGE sentinel exists." },
-
-  { key: "autoUpdateTemplates", type: "boolean", default: true, title: "Auto update template pages (offsets)",
-    description: "Update TEMPLATE pages on startup + after midnight (Logseq open)." },
-  { key: "updateWhenOpenTemplatePage", type: "boolean", default: true, title: "Update offsets when opening template page",
-    description: "When you open a TEMPLATE source page, update offsets once (template-only)." },
-  { key: "autoUpdateRangeOnOpenPage", type: "boolean", default: true, title: "Auto update RANGE on open page",
-    description: "When you open ANY page, update RANGE blocks on that page." },
-  { key: "autoUpdateRangeOnEdit", type: "boolean", default: true, title: "Auto update RANGE on edit",
-    description: "When you edit a block containing RANGE marker/sentinel, update inputs automatically (debounced)." },
-  { key: "maxRangeDays", type: "number", default: DEFAULT_MAX_RANGE_DAYS, title: "Max days for RANGE expansion",
-    description: "Safety limit. RANGE larger than this will be rejected." }
+  {
+    key: "templatePages",
+    type: "string",
+    default: DEFAULT_TEMPLATE_PAGES,
+    title: "Template source page(s) (offsets only)",
+    description: "Comma-separated page names that hold TEMPLATE blocks for offsets. Only these pages are updated for offsets."
+  },
+  {
+    key: "caseInsensitivePageMatch",
+    type: "boolean",
+    default: true,
+    title: "Case-insensitive template page match"
+  },
+  {
+    key: "markerOffsets",
+    type: "string",
+    default: DEFAULT_MARKER_OFFSETS,
+    title: "Marker (offsets)",
+    description: "Marker for offsets blocks (template-only)."
+  },
+  {
+    key: "markerRange",
+    type: "string",
+    default: DEFAULT_MARKER_RANGE,
+    title: "Marker (RANGE)",
+    description: "Marker for RANGE blocks (any page)."
+  },
+  {
+    key: "propertyKey",
+    type: "string",
+    default: "created",
+    title: "Property key",
+    description: "Page property key containing created date (default: created)."
+  },
+  {
+    key: "offsetDays",
+    type: "string",
+    default: DEFAULT_OFFSETS,
+    title: "Ebbinghaus offsets (days)"
+  },
+  {
+    key: "excludeToday",
+    type: "boolean",
+    default: true,
+    title: "Exclude today",
+    description: "If true, offset=1 means yesterday."
+  },
+  // GUI default range (ONLY used when INSERTING range blocks; NOT used to update existing pages)
+  {
+    key: "rangeStart",
+    type: "string",
+    default: "",
+    title: "Default RANGE start (YYYYMMDD)",
+    description: "Used only for inserting RANGE blocks. Existing pages will NOT be overwritten by changing this."
+  },
+  {
+    key: "rangeEnd",
+    type: "string",
+    default: "",
+    title: "Default RANGE end (YYYYMMDD)",
+    description: "Used only for inserting RANGE blocks. Existing pages will NOT be overwritten by changing this."
+  },
+  {
+    key: "autoUpdateTemplates",
+    type: "boolean",
+    default: true,
+    title: "Auto update template pages (offsets)"
+  },
+  {
+    key: "updateWhenOpenTemplatePage",
+    type: "boolean",
+    default: true,
+    title: "Update offsets when opening template page"
+  },
+  {
+    key: "autoUpdateRangeOnOpenPage",
+    type: "boolean",
+    default: true,
+    title: "Auto update RANGE on open page"
+  },
+  {
+    key: "autoUpdateRangeOnEdit",
+    type: "boolean",
+    default: true,
+    title: "Auto update RANGE on edit (debounced)"
+  },
+  {
+    key: "maxRangeDays",
+    type: "number",
+    default: DEFAULT_MAX_RANGE_DAYS,
+    title: "Max days for RANGE expansion"
+  }
 ];
 
 function parseOffsets(s: string): number[] {
@@ -79,7 +140,6 @@ function dateRangeList(startStr: string, endStr: string, maxDays: number): strin
   if (s.getTime() > e.getTime()) return null;
   const n = daysBetweenInclusive(s, e);
   if (n > maxDays) return null;
-
   const out: string[] = [];
   const cur = new Date(s);
   for (let i = 0; i < n; i++) {
@@ -96,7 +156,7 @@ function parseRangeSentinel(content: string): { start: string; end: string } | n
   return { start: m[1], end: m[2] };
 }
 
-function getDefaultRangeFromSettings(): { start: string; end: string } | null {
+function getDefaultRangeForInsert(): { start: string; end: string } | null {
   const s = String(logseq.settings?.rangeStart ?? "").trim();
   const e = String(logseq.settings?.rangeEnd ?? "").trim();
   if (!s || !e) return null;
@@ -150,99 +210,53 @@ async function updateInputsClauseInBlock(uuid: string, content: string, inputsTe
   return true;
 }
 
-function flattenWithParents(tree: BlockEntity[]) {
-  const blocks: BlockEntity[] = [];
-  const parent = new Map<string, string | null>();
-  const children = new Map<string, string[]>();
-  const pushChild = (p: string, c: string) => {
-    const arr = children.get(p) ?? [];
-    arr.push(c);
-    children.set(p, arr);
-  };
-  const walk = (nodes: BlockEntity[], parentUuid: string | null) => {
-    for (const b of nodes) {
-      blocks.push(b);
-      parent.set(b.uuid, parentUuid);
-      if (parentUuid) pushChild(parentUuid, b.uuid);
-      if (b.children?.length) walk(b.children, b.uuid);
-    }
-  };
-  walk(tree, null);
-  return { blocks, parent, children };
-}
-
-function subtreeUuids(root: string, children: Map<string, string[]>): string[] {
-  const out: string[] = [];
-  const stack = [root];
-  while (stack.length) {
-    const u = stack.pop()!;
-    out.push(u);
-    const ch = children.get(u);
-    if (ch?.length) stack.push(...ch);
-  }
-  return out;
-}
-
-function computeInputsForRoot(subUuids: string[], byId: Map<string, BlockEntity>, mode: "offsets" | "range"): { inputsText: string } | null {
-  const maxRangeDays = Number(logseq.settings?.maxRangeDays ?? DEFAULT_MAX_RANGE_DAYS);
-
-  if (mode === "range") {
-    let range: { start: string; end: string } | null = null;
-
-    // 1) Prefer page-local RANGE sentinel
-    for (const u of subUuids) {
-      const b = byId.get(u);
-      if (!b) continue;
-      const r = parseRangeSentinel(b.content);
-      if (r) { range = r; break; }
-    }
-    // 2) Fallback to settings default range
-    if (!range) range = getDefaultRangeFromSettings();
-    if (!range) return null;
-
-    const dates = dateRangeList(range.start, range.end, maxRangeDays);
-    if (!dates) return null;
-    return { inputsText: formatInputsFromList(dates) };
-  }
-
-  const offsets = parseOffsets(String(logseq.settings?.offsetDays || DEFAULT_OFFSETS));
-  const excludeToday = Boolean(logseq.settings?.excludeToday ?? true);
-  const dates = datesByOffsets(offsets, excludeToday);
-  return { inputsText: formatInputsFromList(dates) };
-}
-
-async function updatePageByMarker(pageName: string, marker: string, mode: "offsets" | "range"): Promise<ScanStats> {
+/**
+ * v0.1.12 IMPORTANT REFACTOR:
+ * Update is now per-block (marker must be in the SAME block content that contains :inputs).
+ * This prevents offsets updates from overwriting RANGE blocks (and vice versa), even if blocks are adjacent/siblings.
+ */
+async function updatePageBlocksByMarker(pageName: string, marker: string, mode: "offsets" | "range"): Promise<ScanStats> {
   const stats: ScanStats = { scanned: 0, marked: 0, inputsFound: 0, inputsUpdated: 0 };
   const tree = await getPageTree(pageName);
   if (!tree) return stats;
 
-  const { blocks, parent, children } = flattenWithParents(tree);
-  const byId = new Map(blocks.map((b) => [b.uuid, b]));
-
-  const roots = new Set<string>();
-  for (const b of blocks) {
+  // flatten tree
+  const stack: BlockEntity[] = [...tree];
+  while (stack.length) {
+    const b = stack.pop()!;
     stats.scanned++;
+    if (b.children?.length) stack.push(...b.children);
+
     if (!b.content.includes(marker)) continue;
     stats.marked++;
-    const root = parent.get(b.uuid) ?? b.uuid;
-    roots.add(root);
-  }
 
-  for (const rootUuid of roots) {
-    const sub = subtreeUuids(rootUuid, children);
-    const computed = computeInputsForRoot(sub, byId, mode);
-    if (!computed) continue;
+    // Marker must be in same block; only update inputs inside THIS block.
+    if (!/:inputs\s*\[\[/.test(b.content)) continue;
+    stats.inputsFound++;
 
-    for (const u of sub) {
-      const b = byId.get(u);
-      if (!b) continue;
-      if (/:inputs\s*\[\[/.test(b.content)) {
-        stats.inputsFound++;
-        const ok = await updateInputsClauseInBlock(u, b.content, computed.inputsText);
-        if (ok) stats.inputsUpdated++;
-      }
+    if (mode === "offsets") {
+      const offsets = parseOffsets(String(logseq.settings?.offsetDays || DEFAULT_OFFSETS));
+      const excludeToday = Boolean(logseq.settings?.excludeToday ?? true);
+      const dates = datesByOffsets(offsets, excludeToday);
+      const ok = await updateInputsClauseInBlock(b.uuid, b.content, formatInputsFromList(dates));
+      if (ok) stats.inputsUpdated++;
+      continue;
     }
+
+    // mode === "range"
+    // v0.1.12 decouple: Only use PAGE-LOCAL sentinel for updates.
+    // (Settings rangeStart/end are used only when INSERTING new blocks.)
+    const r = parseRangeSentinel(b.content);
+    if (!r) continue;
+
+    const maxRangeDays = Number(logseq.settings?.maxRangeDays ?? DEFAULT_MAX_RANGE_DAYS);
+    const dates = dateRangeList(r.start, r.end, maxRangeDays);
+    if (!dates) continue;
+
+    const ok = await updateInputsClauseInBlock(b.uuid, b.content, formatInputsFromList(dates));
+    if (ok) stats.inputsUpdated++;
   }
+
   return stats;
 }
 
@@ -252,7 +266,7 @@ async function updateTemplatePagesOffsetsOnce(): Promise<{ pages: string[]; stat
   const total: ScanStats = { scanned: 0, marked: 0, inputsFound: 0, inputsUpdated: 0 };
 
   for (const p of pages) {
-    const s = await updatePageByMarker(p, markerOffsets, "offsets");
+    const s = await updatePageBlocksByMarker(p, markerOffsets, "offsets");
     total.scanned += s.scanned;
     total.marked += s.marked;
     total.inputsFound += s.inputsFound;
@@ -270,7 +284,7 @@ async function updateCurrentPageRangeOnce(): Promise<ScanStats> {
   const markerRange = String(logseq.settings?.markerRange || DEFAULT_MARKER_RANGE);
   const cur = await getCurrentPageName();
   if (!cur) return { scanned: 0, marked: 0, inputsFound: 0, inputsUpdated: 0 };
-  return await updatePageByMarker(cur, markerRange, "range");
+  return await updatePageBlocksByMarker(cur, markerRange, "range");
 }
 
 function msUntilNextMidnight(): number {
@@ -304,7 +318,7 @@ function buildOffsetsQueryBlock(propertyKey: string, marker: string): string {
 }
 
 function buildRangeQueryBlock(propertyKey: string, marker: string): string {
-  const def = getDefaultRangeFromSettings();
+  const def = getDefaultRangeForInsert();
   const sentinel = def ? `RANGE:${def.start}-${def.end}` : "RANGE:20250101-20251010";
   return `#+BEGIN_QUERY
 {:title "Created pages in RANGE"
@@ -325,13 +339,12 @@ function debounceUpdateRange() {
   if (!logseq.settings?.autoUpdateRangeOnEdit) return;
   if (editTimer) window.clearTimeout(editTimer);
   editTimer = window.setTimeout(async () => {
-    try { await updateCurrentPageRangeOnce(); }
-    catch (e) { console.error(e); }
+    try { await updateCurrentPageRangeOnce(); } catch (e) { console.error(e); }
   }, 600);
 }
 
 async function main() {
-  console.log("[Ebbinghaus] plugin version 0.1.11 loaded");
+  console.log("[Ebbinghaus] plugin version 0.1.12 loaded");
   logseq.useSettingsSchema(settings);
 
   // Slash commands
@@ -382,7 +395,7 @@ async function main() {
     }
   );
 
-  // Template offsets auto update
+  // Auto updates
   if (logseq.settings?.autoUpdateTemplates) {
     await updateTemplatePagesOffsetsOnce();
     scheduleDailyTemplateUpdate();
