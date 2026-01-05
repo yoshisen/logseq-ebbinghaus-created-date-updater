@@ -4,28 +4,15 @@ name: release
 on:
   push:
     tags:
-      - "v*.*.*"           
-  workflow_dispatch:
+      - "v*.*.*"            # 日本語: tag が vX.Y.Z 形式で push されたときに自動実行
+  workflow_dispatch:         # 日本語: 手動実行用トリガー
     inputs:
       tag:
-        description: "Existing tag to (re)publish, e.g. v0.1.12"
+        description: "既存のタグ (例: v0.1.12) を指定して再公開"
         required: true
         type: string
       build_from:
-name: release
-
-on:
-  push:
-    tags:
-      - "v*.*.*"            
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Existing tag to (re)publish, e.g. v0.1.12"
-        required: true
-        type: string
-      build_from:
-        description: "Build source: 'tag' (strict) or 'main' (flexible)"
+        description: "ビルド元: 'tag'（厳密）または 'main'（柔軟）"
         required: true
         type: choice
         options:
@@ -34,42 +21,67 @@ on:
         default: tag
 
 permissions:
-  contents: write
+  contents: write            # 日本語: Release 作成のために contents: write が必要
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Decide checkout ref (for workflow_dispatch)
+        id: ref_decider
+        shell: bash
+        run: |
+          # 日本語: 手動実行時にチェックアウトする ref を決定
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ inputs.build_from }}" == "tag" ]]; then
+              # 日本語: tag から厳密にビルドする場合、inputs.tag を使用
+              echo "ref=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+            else
+              # 日本語: main から柔軟にビルドする場合、空にしてデフォルトブランチを使用（必要なら明示的に main と指定してもOK）
+              echo "ref=" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            # 日本語: push（tag）イベント時は checkout ステップ側の式で処理するためここでは空
+            echo "ref=" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.build_from == 'tag' && inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
+          # 日本語:
+          # - 手動実行かつ tag ビルド → 上のステップで決めた inputs.tag
+          # - push（tag）イベント → 現在のタグ（github.ref_type == 'tag' のとき github.ref_name）
+          # - それ以外（手動 main など） → 空でデフォルトブランチ
+          ref: ${{ steps.ref_decider.outputs.ref || (github.ref_type == 'tag' && github.ref_name) || '' }}
 
       - name: Debug workspace
         run: |
+          # 日本語: 実行コンテキストの確認
           echo "Event: ${{ github.event_name }}"
           echo "Ref type: ${{ github.ref_type }}"
           echo "Ref name: ${{ github.ref_name }}"
           pwd
           ls -la
+
+          # 日本語: 必要ファイルの存在確認。tag からビルドする場合は lockfile がタグに含まれている必要あり
           test -f package.json && echo "✅ package.json found" || (echo "❌ missing package.json" && exit 1)
-          test -f package-lock.json && echo "✅ package-lock.json found" || (echo "❌ missing package-lock.json"; echo "👉 If you build_from='tag', the tag must include lockfile."; exit 1)
+          test -f package-lock.json && echo "✅ package-lock.json found" || (echo "❌ missing package-lock.json"; echo "👉 build_from='tag' の場合、対象タグに lockfile が必要です"; exit 1)
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "20" # 日本語: Node.js 20 を使用
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci            # 日本語: lockfile に基づきクリーンインストール
 
       - name: Build plugin
-        run: npm run build
+        run: npm run build     # 日本語: プラグインをビルド
 
       - name: Create zip artifact
         run: |
+          # 日本語: 配布用 zip を作成
           zip -r plugin.zip \
             dist \
             package.json \
@@ -77,6 +89,8 @@ jobs:
             LICENSE \
             icon.png \
             manifest.json
+
+      # --- Release 作成フェーズ ---
 
       - name: Create Release (auto: tag push)
         if: ${{ github.ref_type == 'tag' && github.event_name == 'push' }}
@@ -88,7 +102,6 @@ jobs:
           body: |
             Automated release for ${{ github.ref_name }}.
             Includes built plugin.zip (dist + manifest + icon + docs).
-
 
       - name: Create Release (manual: build from tag)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_from == 'tag' }}
@@ -106,71 +119,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_from == 'main' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: "${{ inputs.tag }}"
-          files: plugin.zip
-          name: "${{ inputs.tag }}"
-          overwrite: true
-          body: |
-            Manual release for existing tag: ${{ inputs.tag }} (built from main).
-            Includes built plugin.zip (dist + manifest + icon + docs).
-
-        description: "Build source: 'tag' (strict) or 'main' (flexible)"
-        required: true
-        type: choice
-        options:
-          - tag
-          - main
-        default: tag
-
-permissions:
-  contents: write
-
-jobs:
-  build-and-release:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.build_from == 'tag' && inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
-
-      - name: Debug workspace
-        run: |
-          echo "Event: ${{ github.event_name }}"
-          echo "Ref type: ${{ github.ref_type }}"
-          echo "Ref name: ${{ github.ref_name }}"
-          pwd
-          ls -la
-          test -f package.json && echo "✅ package.json found" || (echo "❌ missing package.json" && exit 1)
-          test -f package-lock.json && echo "✅ package-lock.json found" || (echo "❌ missing package-lock.json"; echo "👉 If you build_from='tag', the tag must include lockfile."; exit 1)
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build plugin
-        run: npm run build
-
-      - name: Create zip artifact
-        run: |
-          zip -r plugin.zip \
-            dist \
-            package.json \
-            README.md \
-            LICENSE \
-            icon.png \
-            manifest.json
-
-      - name: Create Release (manual: build from main)
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_from == 'main' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "${{ inputs.tag }}"
+          tag_name: "${{ inputs.tag }}"  # 日本語: 既存タグへ上書き公開（上書きは overwrite: true で制御）
           files: plugin.zip
           name: "${{ inputs.tag }}"
           overwrite: true
