@@ -2,15 +2,23 @@
 name: release
 
 on:
+  push:
+    tags:
+      - "v*.*.*"           
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing tag to release (e.g. v0.1.12)"
+        description: "Existing tag to (re)publish, e.g. v0.1.12"
         required: true
         type: string
-  push:
-    tags:
-      - "v*.*.*"         
+      build_from:
+        description: "Build source: 'tag' (strict) or 'main' (flexible)"
+        required: true
+        type: choice
+        options:
+          - tag
+          - main
+        default: tag
 
 permissions:
   contents: write
@@ -20,17 +28,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout the specified tag
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.build_from == 'tag' && inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
+
+      - name: Debug workspace
+        run: |
+          echo "Event: ${{ github.event_name }}"
+          echo "Ref type: ${{ github.ref_type }}"
+          echo "Ref name: ${{ github.ref_name }}"
+          pwd
+          ls -la
+          test -f package.json && echo "✅ package.json found" || (echo "❌ missing package.json" && exit 1)
+          test -f package-lock.json && echo "✅ package-lock.json found" || (echo "❌ missing package-lock.json"; echo "👉 If you build_from='tag', the tag must include lockfile."; exit 1)
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          #cache: "npm"
-          #cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -48,25 +64,14 @@ jobs:
             icon.png \
             manifest.json
 
-      - name: Create GitHub Release and upload asset (manual, existing tag)
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+      - name: Create Release (manual: build from main)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_from == 'main' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: "${{ inputs.tag }}"     
-          name: "${{ inputs.tag }}"
+          tag_name: "${{ inputs.tag }}"
           files: plugin.zip
+          name: "${{ inputs.tag }}"
           overwrite: true
           body: |
-            Automated release for existing tag: ${{ inputs.tag }}.
-            Includes built plugin.zip (dist + manifest + icon + docs).
-
-
-      - name: Create GitHub Release and upload asset (auto, tag push)
-        if: ${{ github.ref_type == 'tag' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          files: plugin.zip
-          name: "${{ github.ref_name }}"
-          body: |
-            Automated release for ${{ github.ref_name }}.
+            Manual release for existing tag: ${{ inputs.tag }} (built from main).
             Includes built plugin.zip (dist + manifest + icon + docs).
