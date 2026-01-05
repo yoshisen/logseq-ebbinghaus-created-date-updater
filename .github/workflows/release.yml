@@ -32,13 +32,6 @@ jobs:
           #cache: "npm"
           #cache-dependency-path: package-lock.json
 
-      - name: Verify lockfile and package.json
-        run: |
-          test -f package.json && echo "✅ package.json found" || (echo "❌ missing package.json" && exit 1)
-          test -f package-lock.json && echo "✅ package-lock.json found" || (echo "❌ missing package-lock.json" && exit 1)
-          npm -v
-          node -v
-
       - name: Install dependencies
         run: npm ci
 
