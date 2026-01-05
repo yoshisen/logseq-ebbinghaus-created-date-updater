@@ -4,78 +4,31 @@ name: release
 on:
   push:
     tags:
-      - "v*.*.*"            # タグ vX.Y.Z を push したときに自動実行
-  workflow_dispatch:         # 手動実行トリガー
-    inputs:
-      tag:
-        description: "既存タグ（例: v0.1.12）を指定"
-        required: true
-        type: string
-      build_from:
-        description: "ビルド元: 'tag'（厳密） または 'main'（柔軟）"
-        required: true
-        type: choice
-        options:
-          - tag
-          - main
-        default: tag
+      - "v*.*.*"        
 
 permissions:
-  contents: write            # Release 作成のために必要
+  contents: write       
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 決定: checkout する ref
-        id: ref_decider
-        shell: bash
-        run: |
-          # 手動実行の場合、選択に応じて ref を決定
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            if [[ "${{ inputs.build_from }}" == "tag" ]]; then
-              echo "ref=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
-            else
-              # main からビルド → 空値でデフォルトブランチを使用（必要なら 'main' を直書き可）
-              echo "ref=" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            # push（タグ）イベントは checkout 側の式で処理するため空
-            echo "ref=" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          # 手動(tag) → 上のステップで決定したタグ
-          # push(tag) → 現在のタグ
-          # 手動(main) → 空値でデフォルトブランチ
-          ref: ${{ steps.ref_decider.outputs.ref || (github.ref_type == 'tag' && github.ref_name) || '' }}
 
-      - name: ワークスペースの確認
-        run: |
-          echo "Event: ${{ github.event_name }}"
-          echo "Ref type: ${{ github.ref_type }}"
-          echo "Ref name: ${{ github.ref_name }}"
-          pwd
-          ls -la
-          # 必須ファイル検査。tag からビルドする場合、そのタグに lockfile が含まれている必要あり
-          test -f package.json && echo "✅ package.json found" || (echo "❌ missing package.json" && exit 1)
-          test -f package-lock.json && echo "✅ package-lock.json found" || (echo "❌ missing package-lock.json"; echo "👉 build_from='tag' の場合、対象タグに lockfile が必要です"; exit 1)
-
-      - name: Node.js をセットアップ
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "20"           
 
-      - name: 依存関係のインストール
-        run: npm ci
+      - name: Install dependencies
+        run: npm ci                    
 
-      - name: プラグインのビルド
-        run: npm run build
+      - name: Build plugin
+        run: npm run build             
 
-      - name: 配布用 zip 作成
+      - name: Create zip artifact
         run: |
           zip -r plugin.zip \
             dist \
@@ -85,39 +38,11 @@ jobs:
             icon.png \
             manifest.json
 
-      # --- Release 作成 ---
-
-      - name: Release 作成（自動: タグ push）
-        if: ${{ github.ref_type == 'tag' && github.event_name == 'push' }}
+      - name: Create GitHub Release and upload asset
         uses: softprops/action-gh-release@v2
         with:
-          files: plugin.zip
+          files: plugin.zip     
           name: "${{ github.ref_name }}"
-          overwrite: true
           body: |
             Automated release for ${{ github.ref_name }}.
-            Includes built plugin.zip (dist + manifest + icon + docs).
-
-      - name: Release 作成（手動: tag からビルド）
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_from == 'tag' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "${{ inputs.tag }}"
-          files: plugin.zip
-          name: "${{ inputs.tag }}"
-          overwrite: true
-          body: |
-            Manual release for existing tag: ${{ inputs.tag }} (built from tag code).
-            Includes built plugin.zip (dist + manifest + icon + docs).
-
-      - name: Release 作成（手動: main からビルド）
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_from == 'main' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "${{ inputs.tag }}"
-          files: plugin.zip
-          name: "${{ inputs.tag }}"
-          overwrite: true
-          body: |
-            Manual release for existing tag: ${{ inputs.tag }} (built from main).
             Includes built plugin.zip (dist + manifest + icon + docs).
