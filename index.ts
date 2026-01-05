@@ -211,7 +211,7 @@ async function updateInputsClauseInBlock(uuid: string, content: string, inputsTe
 }
 
 /**
- * v0.1.13 IMPORTANT REFACTOR:
+ * v0.1.14 IMPORTANT REFACTOR:
  * Update is now per-block (marker must be in the SAME block content that contains :inputs).
  * This prevents offsets updates from overwriting RANGE blocks (and vice versa), even if blocks are adjacent/siblings.
  */
@@ -244,7 +244,7 @@ async function updatePageBlocksByMarker(pageName: string, marker: string, mode: 
     }
 
     // mode === "range"
-    // v0.1.13 decouple: Only use PAGE-LOCAL sentinel for updates.
+    // v0.1.14 decouple: Only use PAGE-LOCAL sentinel for updates.
     // (Settings rangeStart/end are used only when INSERTING new blocks.)
     const r = parseRangeSentinel(b.content);
     if (!r) continue;
@@ -344,7 +344,7 @@ function debounceUpdateRange() {
 }
 
 async function main() {
-  console.log("[Ebbinghaus] plugin version 0.1.13 loaded");
+  console.log("[Ebbinghaus] plugin version 0.1.14 loaded");
   logseq.useSettingsSchema(settings);
 
   // Slash commands

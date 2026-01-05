@@ -1,14 +1,7 @@
 
 {
   "title": "logseq-ebbinghaus-created-date-updater",
-  "description": "A plugin that can query notes for a specified date and a specified date range. This plugin mainly has two functions:
-                    1.Import queries into a template that automatically updates daily. The query retrieves notes created on Ebbinghaus review dates, such as 1, 2, 4... and so on. 
-                      It’s best to reference the template in journals so you know which notes to review each day.
-                    2.Query notes created within a specified date range, making it easier to view notes from a certain period.
-                  指定した日付や日付範囲のノートを検索できるプラグインです。本プラグインには主に2つの機能があります。
-                    1.テンプレートにクエリを取り込み、毎日自動更新します。検索対象は、エビングハウス復習日（例：1日後、2日後、4日後など）に作成されたノートです。
-                      テンプレートはジャーナルに引用するのが望ましく、毎日どのノートを復習するかが分かります。
-                    2.指定した日付範囲内で作成されたノートを検索し、一定期間のノートを確認しやすくします。",
+  "description": "A plugin to query notes for a specific date or date range.\n1. Insert a daily-updating template with queries for Ebbinghaus review dates (1, 2, 4, ... days).\n2. Query notes created within a date range for quick browsing.\n\n指定した日付・期間のノートを検索できます。\n1. エビングハウス復習日（1日後、2日後、4日後...）に作成されたノートを毎日自動更新するテンプレートに取り込みます。\n2. 指定期間に作成されたノートを一覧できます。",
   "author": "yoshisen",
   "repo": "yoshisen/logseq-ebbinghaus-created-date-updater",
   "icon": "icon.png",
