@@ -1,6 +1,6 @@
 {
   "name": "logseq-ebbinghaus-created-date-updater",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "main": "dist/index.js",
   "logseq": {
     "id": "ebbinghaus-created-date-updater",
